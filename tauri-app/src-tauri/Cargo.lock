@@ -307,6 +307,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "clodo-hotel"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "dirs 5.0.1",
+ "png",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-process",
+ "tauri-plugin-updater",
+ "tokio",
+]
+
+[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2385,22 +2402,6 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
-
-[[package]]
-name = "pixel-agents"
-version = "0.1.0"
-dependencies = [
- "dirs 5.0.1",
- "png",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-process",
- "tauri-plugin-updater",
- "tokio",
-]
 
 [[package]]
 name = "pkg-config"

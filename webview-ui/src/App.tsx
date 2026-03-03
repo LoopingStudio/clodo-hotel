@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { OfficeState } from './office/engine/officeState.js'
 import { OfficeCanvas } from './office/components/OfficeCanvas.js'
 import { ToolOverlay } from './office/components/ToolOverlay.js'
@@ -12,6 +12,7 @@ import { PULSE_ANIMATION_DURATION_SEC } from './constants.js'
 import { useEditorActions } from './hooks/useEditorActions.js'
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js'
 import { ZoomControls } from './components/ZoomControls.js'
+import { generateDockIconRgba, type DockIconState } from './dockIcon.js'
 import { BottomToolbar } from './components/BottomToolbar.js'
 import { DebugView } from './components/DebugView.js'
 import { SessionPickerModal } from './components/SessionPickerModal.js'
@@ -125,6 +126,21 @@ function App() {
   const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders, availableSessions, updateAvailable, updateReady } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
 
+  // Dock icon — only in Tauri mode
+  const dockIconState = useMemo<DockIconState>(() => {
+    if (agents.some(id => agentStatuses[id] === 'waiting')) return 'waiting'
+    if (agents.some(id => (agentTools[id] || []).some(t => !t.done))) return 'active'
+    return 'idle'
+  }, [agents, agentStatuses, agentTools])
+
+  useEffect(() => {
+    if (!layoutReady || !('__TAURI__' in window)) return
+    const icon = generateDockIconRgba(dockIconState)
+    if (icon) {
+      vscode.postMessage({ type: 'setDockIcon', rgba: icon.data, width: icon.width, height: icon.height })
+    }
+  }, [dockIconState, layoutReady])
+
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false)
   const [isDebugMode, setIsDebugMode] = useState(false)
 
@@ -192,11 +208,11 @@ function App() {
       <div data-tauri-drag-region style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 28, zIndex: 200, pointerEvents: 'auto' }} />
 
       <style>{`
-        @keyframes pixel-agents-pulse {
+        @keyframes clodo-hotel-pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
         }
-        .pixel-agents-pulse { animation: pixel-agents-pulse ${PULSE_ANIMATION_DURATION_SEC}s ease-in-out infinite; }
+        .clodo-hotel-pulse { animation: clodo-hotel-pulse ${PULSE_ANIMATION_DURATION_SEC}s ease-in-out infinite; }
       `}</style>
 
       <OfficeCanvas
@@ -344,7 +360,7 @@ function App() {
               </button>
             </>
           ) : (
-            <span className="pixel-agents-pulse">Téléchargement de la v{updateAvailable}…</span>
+            <span className="clodo-hotel-pulse">Téléchargement de la v{updateAvailable}…</span>
           )}
         </div>
       )}

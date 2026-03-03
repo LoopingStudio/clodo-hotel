@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use tauri::Emitter;
 
-use crate::constants::{PERMISSION_TIMER_DELAY_MS, PERMISSION_EXEMPT_TOOLS};
+use crate::constants::{PERMISSION_TIMER_DELAY_MS, PERMISSION_EXEMPT_TOOLS, THINKING_TOOL_ID};
 use crate::types::SharedState;
 
 pub async fn cancel_waiting_timer(agent_id: u32, state: &SharedState) {
@@ -37,8 +37,15 @@ pub async fn start_waiting_timer(
             s.waiting_timers.remove(&agent_id);
             if let Some(agent) = s.agents.get_mut(&agent_id) {
                 agent.is_waiting = true;
+                agent.active_tool_ids.remove(THINKING_TOOL_ID);
+                agent.active_tool_statuses.remove(THINKING_TOOL_ID);
+                agent.active_tool_names.remove(THINKING_TOOL_ID);
             }
         }
+        let _ = ah.emit(
+            "pa-message",
+            serde_json::json!({ "type": "agentToolDone", "id": agent_id, "toolId": THINKING_TOOL_ID }),
+        );
         let _ = ah.emit(
             "pa-message",
             serde_json::json!({ "type": "agentStatus", "id": agent_id, "status": "waiting" }),

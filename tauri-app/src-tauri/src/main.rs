@@ -14,7 +14,7 @@ mod agent_server;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 use agent_server::{
     add_session_as_agent, remove_agent, restore_agents, send_existing_agents, persist_agents,
@@ -118,10 +118,10 @@ async fn handle_message(
 
         "saveLayout" => {
             if let Some(layout) = message.get("layout") {
-                if let Err(e) = write_layout_to_file(layout) {
-                    eprintln!("[Pixel Agents] saveLayout error: {e}");
+                if let Err(e) = write_layout_to_file(layout, &app_handle) {
+                    eprintln!("[Clodo Hotel] saveLayout error: {e}");
                 } else {
-                    mark_own_write(&state_arc).await;
+                    mark_own_write(&state_arc, &app_handle).await;
                 }
             }
         }
@@ -157,10 +157,10 @@ async fn handle_message(
         "importLayoutData" => {
             if let Some(layout) = message.get("layout") {
                 if is_valid_layout(layout) {
-                    if let Err(e) = write_layout_to_file(layout) {
-                        eprintln!("[Pixel Agents] importLayoutData error: {e}");
+                    if let Err(e) = write_layout_to_file(layout, &app_handle) {
+                        eprintln!("[Clodo Hotel] importLayoutData error: {e}");
                     } else {
-                        mark_own_write(&state_arc).await;
+                        mark_own_write(&state_arc, &app_handle).await;
                         let _ = app_handle.emit(
                             "pa-message",
                             serde_json::json!({ "type": "layoutLoaded", "layout": layout }),
@@ -171,14 +171,14 @@ async fn handle_message(
         }
 
         "exportLayout" => {
-            if let Some(layout_val) = read_layout_from_file() {
+            if let Some(layout_val) = read_layout_from_file(&app_handle) {
                 let ah = app_handle.clone();
                 tokio::task::spawn_blocking(move || {
                     use tauri_plugin_dialog::DialogExt;
                     if let Some(file_path) = ah
                         .dialog()
                         .file()
-                        .set_file_name("pixel-agents-layout.json")
+                        .set_file_name("clodo-hotel-layout.json")
                         .add_filter("JSON", &["json"])
                         .blocking_save_file()
                     {
@@ -214,8 +214,8 @@ async fn handle_message(
             .flatten();
 
             if let Some(layout) = picked {
-                if write_layout_to_file(&layout).is_ok() {
-                    mark_own_write(&state_arc).await;
+                if write_layout_to_file(&layout, &app_handle).is_ok() {
+                    mark_own_write(&state_arc, &app_handle).await;
                     let _ = app_handle.emit(
                         "pa-message",
                         serde_json::json!({ "type": "layoutLoaded", "layout": layout }),
@@ -236,8 +236,23 @@ async fn handle_message(
             }
         }
 
+        "setDockIcon" => {
+            if let (Some(b64), Some(w), Some(h)) = (
+                message.get("rgba").and_then(|v| v.as_str()),
+                message.get("width").and_then(|v| v.as_u64()),
+                message.get("height").and_then(|v| v.as_u64()),
+            ) {
+                use base64::Engine;
+                if let Ok(rgba) = base64::engine::general_purpose::STANDARD.decode(b64) {
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let icon = tauri::image::Image::new_owned(rgba, w as u32, h as u32);
+                        let _: Result<(), _> = window.set_icon(icon);
+                    }
+                }
+            }
+        }
+
         "relaunchApp" => {
-            use tauri_plugin_process::ProcessExt;
             app_handle.restart();
         }
 
@@ -333,8 +348,7 @@ async fn handle_webview_ready(state: SharedState, app_handle: tauri::AppHandle) 
     send_existing_agents(&state, &app_handle).await;
 
     // 8. layoutLoaded
-    let layout = read_layout_from_file()
-        .or_else(|| asset_loader::load_default_layout(&assets_root));
+    let layout = asset_loader::load_default_layout(&assets_root);
 
     if let Some(ref layout_val) = layout {
         let _ = app_handle.emit(
@@ -427,5 +441,5 @@ fn main() {
         .manage(shared_state)
         .invoke_handler(tauri::generate_handler![handle_message])
         .run(tauri::generate_context!())
-        .expect("error while running Pixel Agents");
+        .expect("error while running Clodo Hotel");
 }

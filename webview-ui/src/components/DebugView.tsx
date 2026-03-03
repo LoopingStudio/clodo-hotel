@@ -16,7 +16,7 @@ const DEBUG_Z = 40
 function ToolDot({ tool }: { tool: ToolActivity }) {
   return (
     <span
-      className={tool.done ? undefined : 'pixel-agents-pulse'}
+      className={tool.done ? undefined : 'clodo-hotel-pulse'}
       style={{
         width: 6,
         height: 6,

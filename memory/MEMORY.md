@@ -1,4 +1,4 @@
-# Pixel Agents — Memory
+# Clodo Hotel — Memory
 
 ## App Standalone (standalone/)
 
@@ -18,9 +18,9 @@ Fichiers clés standalone :
 
 Différences vs extension VS Code :
 - Pas de `vscode.Terminal` → `sessionId` + `projectDir` seulement
-- Persistence dans `~/.pixel-agents/standalone-state.json` au lieu de workspaceState
+- Persistence dans `~/.clodo-hotel/standalone-state.json` au lieu de workspaceState
 - Message `availableSessions` nouveau (projets/sessions détectés)
-- Layout partagé avec l'extension : `~/.pixel-agents/layout.json`
+- Layout partagé avec l'extension : `~/.clodo-hotel/layout.json`
 
 
 
@@ -31,7 +31,7 @@ Différences vs extension VS Code :
 - **`restoreAgents` ne doit s'appeler que si `agents.size === 0`** : évite les doublons de watchers au refresh.
 - **`isSessionPickerOpen`** : séparer l'état d'ouverture de la modale des données `availableSessions`, sinon tout broadcast `availableSessions` ouvre la modale.
 - **`extractProjectPath` doit scanner plusieurs lignes** : le premier record JSONL est souvent un `file-history-snapshot` sans `cwd`. Scanner jusqu'à 8KB.
-- **Fallback dir hash → path** : `dirName.replace(/-/g, '/')` casse les noms avec tirets (`pixel-agents` → `pixel/agents`). Utiliser `path.basename(projectPath)` après extraction correcte du `cwd`.
+- **Fallback dir hash → path** : `dirName.replace(/-/g, '/')` casse les noms avec tirets (ex: `mon-projet` → `mon/projet`). Utiliser `path.basename(projectPath)` après extraction correcte du `cwd`.
 
 ## Setup / Debug
 

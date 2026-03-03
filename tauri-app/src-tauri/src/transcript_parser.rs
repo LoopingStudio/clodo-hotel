@@ -4,6 +4,7 @@ use tauri::Emitter;
 use crate::constants::{
     PERMISSION_EXEMPT_TOOLS, TOOL_DONE_DELAY_MS, TEXT_IDLE_DELAY_MS,
     BASH_COMMAND_DISPLAY_MAX_LENGTH, TASK_DESCRIPTION_DISPLAY_MAX_LENGTH,
+    THINKING_TOOL_ID, THINKING_TOOL_STATUS,
 };
 use crate::timer_manager::{
     cancel_waiting_timer, start_waiting_timer, start_permission_timer,
@@ -99,7 +100,9 @@ async fn handle_assistant(
     };
 
     let has_tool_use = content.iter().any(|b| b.get("type").and_then(|t| t.as_str()) == Some("tool_use"));
-    let has_text = content.iter().any(|b| b.get("type").and_then(|t| t.as_str()) == Some("text"));
+    let has_text = content.iter().any(|b| {
+        matches!(b.get("type").and_then(|t| t.as_str()), Some("text") | Some("thinking"))
+    });
 
     if has_tool_use {
         cancel_waiting_timer(agent_id, state).await;
@@ -166,6 +169,28 @@ async fn handle_assistant(
             let s = state.lock().await;
             s.agents.get(&agent_id).map(|a| a.had_tools_in_turn).unwrap_or(false)
         };
+        {
+            let mut s = state.lock().await;
+            if let Some(agent) = s.agents.get_mut(&agent_id) {
+                agent.is_waiting = false;
+                agent.active_tool_ids.insert(THINKING_TOOL_ID.to_string());
+                agent.active_tool_statuses.insert(THINKING_TOOL_ID.to_string(), THINKING_TOOL_STATUS.to_string());
+                agent.active_tool_names.insert(THINKING_TOOL_ID.to_string(), THINKING_TOOL_ID.to_string());
+            }
+        }
+        let _ = app_handle.emit(
+            "pa-message",
+            serde_json::json!({ "type": "agentStatus", "id": agent_id, "status": "active" }),
+        );
+        let _ = app_handle.emit(
+            "pa-message",
+            serde_json::json!({
+                "type": "agentToolStart",
+                "id": agent_id,
+                "toolId": THINKING_TOOL_ID,
+                "status": THINKING_TOOL_STATUS,
+            }),
+        );
         if !had_tools {
             start_waiting_timer(agent_id, TEXT_IDLE_DELAY_MS, state, app_handle).await;
         }

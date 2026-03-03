@@ -97,24 +97,31 @@ fn to_rgba(bytes: &[u8], info: &png::OutputInfo, width: u32, height: u32) -> Vec
 /// Return the assets root directory.
 ///
 /// Priority:
-///  1. `resource_dir/assets/` (production bundle)
-///  2. `CARGO_MANIFEST_DIR/../../webview-ui/public` (development)
+///  1. `CARGO_MANIFEST_DIR/../../webview-ui/public` (development — always live files)
+///  2. `resource_dir/assets/` (production bundle)
 pub fn get_assets_root(app_handle: &tauri::AppHandle) -> PathBuf {
     use tauri::Manager;
-    if let Ok(res_dir) = app_handle.path().resource_dir() {
-        let candidate = res_dir.join("assets");
-        if candidate
-            .join("furniture")
-            .join("furniture-catalog.json")
-            .exists()
-        {
-            // Return the parent of assets/ so callers can do root/assets/...
-            return res_dir;
-        }
+    // In dev builds, always use the live source files so edits are reflected immediately
+    #[cfg(debug_assertions)]
+    {
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+        return manifest.join("../../webview-ui/public");
     }
-    // Dev: two levels up from src-tauri/ → project root, then into webview-ui/public
-    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    manifest.join("../../webview-ui/public")
+    #[cfg(not(debug_assertions))]
+    {
+        if let Ok(res_dir) = app_handle.path().resource_dir() {
+            let candidate = res_dir.join("assets");
+            if candidate
+                .join("furniture")
+                .join("furniture-catalog.json")
+                .exists()
+            {
+                return res_dir;
+            }
+        }
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+        manifest.join("../../webview-ui/public")
+    }
 }
 
 // ── Furniture ─────────────────────────────────────────────────

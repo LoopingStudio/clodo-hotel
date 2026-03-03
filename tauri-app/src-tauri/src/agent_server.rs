@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use tauri::Emitter;
 
-use crate::constants::{PIXEL_AGENTS_DIR, STANDALONE_STATE_FILE, JSONL_POLL_INTERVAL_MS};
+use crate::constants::{CLODO_HOTEL_DIR, STANDALONE_STATE_FILE, JSONL_POLL_INTERVAL_MS};
 use crate::file_watcher::{start_file_watching, stop_file_watching};
 use crate::timer_manager::{cancel_waiting_timer, cancel_permission_timer};
 use crate::types::{AgentState, PersistedAgent, PersistedState, SharedState};
@@ -10,14 +10,14 @@ use crate::types::{AgentState, PersistedAgent, PersistedState, SharedState};
 fn state_file_path() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("/"))
-        .join(PIXEL_AGENTS_DIR)
+        .join(CLODO_HOTEL_DIR)
         .join(STANDALONE_STATE_FILE)
 }
 
 fn ensure_state_dir() {
     let dir = dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("/"))
-        .join(PIXEL_AGENTS_DIR);
+        .join(CLODO_HOTEL_DIR);
     if !dir.exists() {
         let _ = std::fs::create_dir_all(&dir);
     }

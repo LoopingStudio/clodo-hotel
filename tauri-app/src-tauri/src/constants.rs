@@ -27,10 +27,14 @@ pub const CHAR_FRAMES_PER_ROW: u32 = 7;
 pub const CHAR_COUNT: u32 = 6;
 
 // ── User-Level Persistence ────────────────────────────────────
-pub const PIXEL_AGENTS_DIR: &str = ".pixel-agents";
+pub const CLODO_HOTEL_DIR: &str = ".clodo-hotel";
 pub const LAYOUT_FILE_NAME: &str = "layout.json";
 pub const LAYOUT_FILE_POLL_INTERVAL_MS: u64 = 2000;
 pub const STANDALONE_STATE_FILE: &str = "standalone-state.json";
 
 // ── Permission Exempt Tools ───────────────────────────────────
 pub const PERMISSION_EXEMPT_TOOLS: &[&str] = &["Task", "AskUserQuestion"];
+
+// ── Synthetic tool ID for thinking/text generation ───────────
+pub const THINKING_TOOL_ID: &str = "__thinking__";
+pub const THINKING_TOOL_STATUS: &str = "Thinking...";

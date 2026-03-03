@@ -6,7 +6,7 @@
 
 ```sh
 cd tauri-app
-npm run tauri signer generate -w ~/.tauri/pixel-agents.key
+npm run tauri signer generate -w ~/.tauri/clodo-hotel.key
 ```
 
 La commande affiche une **clé publique** (commence par `dW50cnVzdGVkI...`). Garde-la.
@@ -26,11 +26,11 @@ Dans `tauri-app/src-tauri/tauri.conf.json`, remplace `REPLACE_WITH_YOUR_PUBLIC_K
 
 ### 3. Ajouter les secrets GitHub
 
-Sur `github.com/pablodelucca/pixel-agents` → **Settings → Secrets and variables → Actions** → New secret :
+Sur `github.com/pablodelucca/clodo-hotel` → **Settings → Secrets and variables → Actions** → New secret :
 
 | Nom | Valeur |
 |-----|--------|
-| `TAURI_SIGNING_PRIVATE_KEY` | contenu du fichier `~/.tauri/pixel-agents.key` |
+| `TAURI_SIGNING_PRIVATE_KEY` | contenu du fichier `~/.tauri/clodo-hotel.key` |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | mot de passe choisi (laisser vide si aucun) |
 
 ---
@@ -64,7 +64,7 @@ git push origin main --tags
 - Crée la GitHub Release avec les installeurs (`.dmg`, `.msi`, `.AppImage`)
 - Génère `latest.json` pour les auto-updates
 
-Lien de téléchargement : `https://github.com/pablodelucca/pixel-agents/releases/latest`
+Lien de téléchargement : `https://github.com/pablodelucca/clodo-hotel/releases/latest`
 
 ---
 

@@ -1,12 +1,9 @@
-out
 dist
 node_modules
-.vscode-test/
-*.vsix
 .claude/
 /logs
 /sprites-export
 .env
 
-# Tauri — Rust build output (énorme, pas à committer)
+# Tauri — Rust build output
 tauri-app/src-tauri/target/
