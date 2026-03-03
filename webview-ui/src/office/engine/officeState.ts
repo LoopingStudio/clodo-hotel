@@ -7,6 +7,7 @@ import {
   DISMISS_BUBBLE_FAST_FADE_SEC,
   INACTIVE_SEAT_TIMER_MIN_SEC,
   INACTIVE_SEAT_TIMER_RANGE_SEC,
+  WANDER_STAGGER_MAX_SEC,
   AUTO_ON_FACING_DEPTH,
   AUTO_ON_SIDE_DEPTH,
   CHARACTER_SITTING_OFFSET_PX,
@@ -504,6 +505,8 @@ export class OfficeState {
         ch.seatTimer = -1
         ch.path = []
         ch.moveProgress = 0
+        // Pre-stagger wander timer so agents going idle simultaneously don't synchronize
+        ch.wanderTimer = Math.random() * WANDER_STAGGER_MAX_SEC
       }
       this.rebuildFurnitureInstances()
     }

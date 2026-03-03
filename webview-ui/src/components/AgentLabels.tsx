@@ -73,9 +73,9 @@ export function AgentLabels({
 
         let dotColor = 'transparent'
         if (isWaiting) {
-          dotColor = 'var(--vscode-charts-yellow, #cca700)'
+          dotColor = '#cca700'
         } else if (isActive) {
-          dotColor = 'var(--vscode-charts-blue, #3794ff)'
+          dotColor = '#3794ff'
         }
 
         const labelText = subLabelMap.get(id) || `Agent #${id}`
@@ -111,7 +111,7 @@ export function AgentLabels({
               style={{
                 fontSize: isSub ? '16px' : '18px',
                 fontStyle: isSub ? 'italic' : undefined,
-                color: 'var(--vscode-foreground)',
+                color: 'rgba(255, 255, 255, 0.9)',
                 background: 'rgba(30,30,46,0.7)',
                 padding: '1px 4px',
                 borderRadius: 2,

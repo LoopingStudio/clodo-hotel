@@ -40,6 +40,20 @@ export interface WorkspaceFolder {
   path: string
 }
 
+export interface SessionInfo {
+  sessionId: string
+  jsonlFile: string
+  lastModified: number
+  projectPath: string
+  isTracked: boolean
+}
+
+export interface ProjectSessions {
+  dirName: string
+  projectPath: string
+  sessions: SessionInfo[]
+}
+
 export interface ExtensionMessageState {
   agents: number[]
   selectedAgent: number | null
@@ -50,6 +64,9 @@ export interface ExtensionMessageState {
   layoutReady: boolean
   loadedAssets?: { catalog: FurnitureAsset[]; sprites: Record<string, string[][]> }
   workspaceFolders: WorkspaceFolder[]
+  availableSessions: ProjectSessions[] | null
+  updateAvailable: string | null
+  updateReady: boolean
 }
 
 function saveAgentSeats(os: OfficeState): void {
@@ -75,6 +92,9 @@ export function useExtensionMessages(
   const [layoutReady, setLayoutReady] = useState(false)
   const [loadedAssets, setLoadedAssets] = useState<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>()
   const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceFolder[]>([])
+  const [availableSessions, setAvailableSessions] = useState<ProjectSessions[] | null>(null)
+  const [updateAvailable, setUpdateAvailable] = useState<string | null>(null)
+  const [updateReady, setUpdateReady] = useState(false)
 
   // Track whether initial layout has been loaded (ref to avoid re-render)
   const layoutReadyRef = useRef(false)
@@ -82,6 +102,7 @@ export function useExtensionMessages(
   useEffect(() => {
     // Buffer agents from existingAgents until layout is loaded
     let pendingAgents: Array<{ id: number; palette?: number; hueShift?: number; seatId?: string; folderName?: string }> = []
+    let pendingWaitingIds: Set<number> = new Set()
 
     const handler = (e: MessageEvent) => {
       const msg = e.data
@@ -105,8 +126,12 @@ export function useExtensionMessages(
         // Add buffered agents now that layout (and seats) are correct
         for (const p of pendingAgents) {
           os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true, p.folderName)
+          if (pendingWaitingIds.has(p.id)) {
+            os.setAgentActive(p.id, false)
+          }
         }
         pendingAgents = []
+        pendingWaitingIds = new Set()
         layoutReadyRef.current = true
         setLayoutReady(true)
         if (os.characters.size > 0) {
@@ -149,10 +174,14 @@ export function useExtensionMessages(
         const incoming = msg.agents as number[]
         const meta = (msg.agentMeta || {}) as Record<number, { palette?: number; hueShift?: number; seatId?: string }>
         const folderNames = (msg.folderNames || {}) as Record<number, string>
+        const waitingIds = (msg.waitingIds || []) as number[]
         // Buffer agents — they'll be added in layoutLoaded after seats are built
         for (const id of incoming) {
           const m = meta[id]
           pendingAgents.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId, folderName: folderNames[id] })
+        }
+        for (const id of waitingIds) {
+          pendingWaitingIds.add(id)
         }
         setAgents((prev) => {
           const ids = new Set(prev)
@@ -353,6 +382,12 @@ export function useExtensionMessages(
         } catch (err) {
           console.error(`❌ Webview: Error processing furnitureAssetsLoaded:`, err)
         }
+      } else if (msg.type === 'availableSessions') {
+        setAvailableSessions(msg.projects as ProjectSessions[])
+      } else if (msg.type === 'updateAvailable') {
+        setUpdateAvailable(msg.version as string)
+      } else if (msg.type === 'updateReady') {
+        setUpdateReady(true)
       }
     }
     window.addEventListener('message', handler)
@@ -360,5 +395,9 @@ export function useExtensionMessages(
     return () => window.removeEventListener('message', handler)
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders }
+  return {
+    agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters,
+    layoutReady, loadedAssets, workspaceFolders,
+    availableSessions, updateAvailable, updateReady,
+  }
 }

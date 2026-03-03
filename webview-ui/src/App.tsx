@@ -14,6 +14,7 @@ import { useEditorKeyboard } from './hooks/useEditorKeyboard.js'
 import { ZoomControls } from './components/ZoomControls.js'
 import { BottomToolbar } from './components/BottomToolbar.js'
 import { DebugView } from './components/DebugView.js'
+import { SessionPickerModal } from './components/SessionPickerModal.js'
 
 // Game state lives outside React — updated imperatively by message handlers
 const officeStateRef = { current: null as OfficeState | null }
@@ -121,8 +122,10 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders, availableSessions, updateAvailable, updateReady } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
+
+  const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false)
   const [isDebugMode, setIsDebugMode] = useState(false)
 
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), [])
@@ -177,7 +180,7 @@ function App() {
 
   if (!layoutReady) {
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--vscode-foreground)' }}>
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255, 255, 255, 0.7)' }}>
         Loading...
       </div>
     )
@@ -185,6 +188,9 @@ function App() {
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      {/* Drag region for overlay title bar — height matches macOS title bar */}
+      <div data-tauri-drag-region style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 28, zIndex: 200, pointerEvents: 'auto' }} />
+
       <style>{`
         @keyframes pixel-agents-pulse {
           0%, 100% { opacity: 1; }
@@ -225,7 +231,7 @@ function App() {
 
       <BottomToolbar
         isEditMode={editor.isEditMode}
-        onOpenClaude={editor.handleOpenClaude}
+        onOpenClaude={() => { editor.handleOpenClaude(); setIsSessionPickerOpen(true) }}
         onToggleEditMode={editor.handleToggleEditMode}
         isDebugMode={isDebugMode}
         onToggleDebugMode={handleToggleDebugMode}
@@ -304,6 +310,49 @@ function App() {
           agentStatuses={agentStatuses}
           subagentTools={subagentTools}
           onSelectAgent={handleSelectAgent}
+        />
+      )}
+
+      {(updateAvailable || updateReady) && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 56,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 'var(--pixel-controls-z)',
+            background: 'var(--pixel-bg)',
+            border: '2px solid var(--pixel-accent)',
+            padding: '6px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            boxShadow: 'var(--pixel-shadow)',
+            fontSize: '22px',
+            color: 'var(--pixel-text)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {updateReady ? (
+            <>
+              <span>Mise à jour prête !</span>
+              <button
+                style={{ padding: '2px 10px', fontSize: '22px', background: 'var(--pixel-accent)', color: '#fff', border: 'none', cursor: 'pointer' }}
+                onClick={() => vscode.postMessage({ type: 'relaunchApp' })}
+              >
+                Redémarrer
+              </button>
+            </>
+          ) : (
+            <span className="pixel-agents-pulse">Téléchargement de la v{updateAvailable}…</span>
+          )}
+        </div>
+      )}
+
+      {isSessionPickerOpen && availableSessions !== null && (
+        <SessionPickerModal
+          projects={availableSessions}
+          onClose={() => setIsSessionPickerOpen(false)}
         />
       )}
     </div>

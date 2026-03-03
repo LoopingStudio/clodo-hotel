@@ -7,3 +7,6 @@ node_modules
 /logs
 /sprites-export
 .env
+
+# Tauri — Rust build output (énorme, pas à committer)
+tauri-app/src-tauri/target/

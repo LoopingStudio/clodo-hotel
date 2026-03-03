@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { vscode } from '../vscodeApi.js'
+import { vscode, isStandalone } from '../vscodeApi.js'
 import { isSoundEnabled, setSoundEnabled } from '../notificationSound.js'
 
 interface SettingsModalProps {
@@ -120,20 +120,58 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
         >
           Export Layout
         </button>
-        <button
-          onClick={() => {
-            vscode.postMessage({ type: 'importLayout' })
-            onClose()
-          }}
-          onMouseEnter={() => setHovered('import')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'import' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          Import Layout
-        </button>
+        {isStandalone ? (
+          <label
+            onMouseEnter={() => setHovered('import')}
+            onMouseLeave={() => setHovered(null)}
+            style={{
+              ...menuItemBase,
+              background: hovered === 'import' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              cursor: 'pointer',
+            }}
+          >
+            Import Layout
+            <input
+              type="file"
+              accept=".json"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                const reader = new FileReader()
+                reader.onload = (ev) => {
+                  try {
+                    const imported = JSON.parse(ev.target?.result as string) as Record<string, unknown>
+                    if (imported.version !== 1 || !Array.isArray(imported.tiles)) {
+                      alert('Invalid layout file')
+                      return
+                    }
+                    vscode.postMessage({ type: 'importLayoutData', layout: imported })
+                    onClose()
+                  } catch {
+                    alert('Failed to parse layout file')
+                  }
+                }
+                reader.readAsText(file)
+              }}
+            />
+          </label>
+        ) : (
+          <button
+            onClick={() => {
+              vscode.postMessage({ type: 'importLayout' })
+              onClose()
+            }}
+            onMouseEnter={() => setHovered('import')}
+            onMouseLeave={() => setHovered(null)}
+            style={{
+              ...menuItemBase,
+              background: hovered === 'import' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+            }}
+          >
+            Import Layout
+          </button>
+        )}
         <button
           onClick={() => {
             const newVal = !isSoundEnabled()
