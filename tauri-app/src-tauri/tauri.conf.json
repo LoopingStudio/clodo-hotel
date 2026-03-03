@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Clodo Hotel",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.clodo-hotel.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -28,9 +28,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_YOUR_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYxRTgwODI5MzNBRUJBODEKUldTQnVxNHpLUWpvWWQ3WXBWSWx4ekJlZW16eFV5UmZaMjUvRERsTjZyMkxyZk5RaDVWbjNqMXUK",
       "endpoints": [
-        "https://github.com/pablodelucca/clodo-hotel/releases/latest/download/latest.json"
+        "https://github.com/LoopingStudio/clodo-hotel/releases/latest/download/latest.json"
       ]
     }
   },
