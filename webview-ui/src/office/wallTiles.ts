@@ -16,7 +16,7 @@ import { getColorizedSprite } from './colorize.js'
 /** 16 wall sprites indexed by bitmask (0-15) */
 let wallSprites: SpriteData[] | null = null
 
-/** Set wall sprites (called once when extension sends wallTilesLoaded) */
+/** Set wall sprites (called once when backend sends wallTilesLoaded) */
 export function setWallSprites(sprites: SpriteData[]): void {
   wallSprites = sprites
 }

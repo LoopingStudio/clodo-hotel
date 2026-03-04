@@ -6,8 +6,8 @@ import { EditorToolbar } from './office/editor/EditorToolbar.js'
 import { EditorState } from './office/editor/editorState.js'
 import { EditTool } from './office/types.js'
 import { isRotatable } from './office/layout/furnitureCatalog.js'
-import { vscode } from './vscodeApi.js'
-import { useExtensionMessages } from './hooks/useExtensionMessages.js'
+import { appBridge } from './appBridge.js'
+import { useAppMessages } from './hooks/useAppMessages.js'
 import { PULSE_ANIMATION_DURATION_SEC } from './constants.js'
 import { useEditorActions } from './hooks/useEditorActions.js'
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js'
@@ -123,7 +123,7 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders, availableSessions, updateAvailable, updateReady } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders, availableSessions, updateAvailable, updateReady } = useAppMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
 
   // Dock icon — only in Tauri mode
@@ -137,7 +137,7 @@ function App() {
     if (!layoutReady || !('__TAURI__' in window)) return
     const icon = generateDockIconRgba(dockIconState)
     if (icon) {
-      vscode.postMessage({ type: 'setDockIcon', rgba: icon.data, width: icon.width, height: icon.height })
+      appBridge.postMessage({ type: 'setDockIcon', rgba: icon.data, width: icon.width, height: icon.height })
     }
   }, [dockIconState, layoutReady])
 
@@ -147,7 +147,7 @@ function App() {
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), [])
 
   const handleSelectAgent = useCallback((id: number) => {
-    vscode.postMessage({ type: 'focusAgent', id })
+    appBridge.postMessage({ type: 'focusAgent', id })
   }, [])
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -166,7 +166,7 @@ function App() {
   )
 
   const handleCloseAgent = useCallback((id: number) => {
-    vscode.postMessage({ type: 'closeAgent', id })
+    appBridge.postMessage({ type: 'closeAgent', id })
   }, [])
 
   const handleClick = useCallback((agentId: number) => {
@@ -174,7 +174,7 @@ function App() {
     const os = getOfficeState()
     const meta = os.subagentMeta.get(agentId)
     const focusId = meta ? meta.parentAgentId : agentId
-    vscode.postMessage({ type: 'focusAgent', id: focusId })
+    appBridge.postMessage({ type: 'focusAgent', id: focusId })
   }, [])
 
   const officeState = getOfficeState()
@@ -354,7 +354,7 @@ function App() {
               <span>Mise à jour prête !</span>
               <button
                 style={{ padding: '2px 10px', fontSize: '22px', background: 'var(--pixel-accent)', color: '#fff', border: 'none', cursor: 'pointer' }}
-                onClick={() => vscode.postMessage({ type: 'relaunchApp' })}
+                onClick={() => appBridge.postMessage({ type: 'relaunchApp' })}
               >
                 Redémarrer
               </button>

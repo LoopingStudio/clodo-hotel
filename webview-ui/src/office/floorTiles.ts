@@ -22,7 +22,7 @@ let floorSprites: SpriteData[] = []
 /** Wall color constant */
 export const WALL_COLOR = '#3A3A5C'
 
-/** Set floor tile sprites (called once when extension sends floorTilesLoaded) */
+/** Set floor tile sprites (called once when backend sends floorTilesLoaded) */
 export function setFloorSprites(sprites: SpriteData[]): void {
   floorSprites = sprites
   clearColorizeCache()

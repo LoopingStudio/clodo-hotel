@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { ProjectSessions, SessionInfo } from '../hooks/useExtensionMessages.js'
-import { vscode } from '../vscodeApi.js'
+import type { ProjectSessions, SessionInfo } from '../hooks/useAppMessages.js'
+import { appBridge } from '../appBridge.js'
 
 interface SessionPickerModalProps {
   projects: ProjectSessions[]
@@ -22,7 +22,7 @@ export function SessionPickerModal({ projects, onClose }: SessionPickerModalProp
 
   const handleAdd = (session: SessionInfo, folderName: string) => {
     if (session.isTracked) return
-    vscode.postMessage({
+    appBridge.postMessage({
       type: 'addSession',
       sessionId: session.sessionId,
       jsonlFile: session.jsonlFile,

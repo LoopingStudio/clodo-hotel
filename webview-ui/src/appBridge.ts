@@ -1,6 +1,6 @@
-// Tauri mode: window.__TAURI__ is injected by the Tauri runtime.
+// Tauri bridge: window.__TAURI__ is injected by the Tauri runtime.
 // Re-dispatch Tauri events as window 'message' events so
-// useExtensionMessages.ts works unchanged.
+// useAppMessages.ts works unchanged.
 const tauriGlobal = (globalThis as Record<string, unknown>)['__TAURI__'] as
   | Record<string, unknown>
   | undefined
@@ -26,7 +26,7 @@ listen('pa-message', (event: { payload: unknown }) => {
   console.error('[Clodo Hotel] Tauri listen error:', err)
 })
 
-export const vscode = {
+export const appBridge = {
   postMessage(msg: unknown): void {
     if (!listenerReady) {
       pending.push(msg)

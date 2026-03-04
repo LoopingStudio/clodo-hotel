@@ -4,9 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>webview-ui</title>
+    <title>Clodo Hotel</title>
+    <style>
+      #crash-screen{display:none;position:fixed;inset:0;background:#1e1e2e;color:#f44;font-family:monospace;padding:32px;white-space:pre-wrap;overflow:auto;z-index:99999}
+      #crash-screen h1{color:#ff6b6b;font-size:18px;margin:0 0 16px}
+      #crash-screen pre{color:#cdd6f4;font-size:13px;margin:0}
+    </style>
+    <script>
+      window.onerror=function(msg,src,line,col,err){
+        var el=document.getElementById('crash-screen');
+        if(el){el.style.display='block';el.innerHTML='<h1>Clodo Hotel crashed</h1><pre>'+
+          (err&&err.stack?err.stack:(msg+'\n  at '+src+':'+line+':'+col))+'</pre>';}
+      };
+      window.onunhandledrejection=function(e){
+        var el=document.getElementById('crash-screen');
+        if(el){el.style.display='block';el.innerHTML='<h1>Clodo Hotel crashed</h1><pre>'+
+          (e.reason&&e.reason.stack?e.reason.stack:String(e.reason))+'</pre>';}
+      };
+    </script>
   </head>
   <body>
+    <div id="crash-screen"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

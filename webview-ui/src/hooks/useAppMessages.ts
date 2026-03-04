@@ -7,7 +7,7 @@ import { buildDynamicCatalog } from '../office/layout/furnitureCatalog.js'
 import { setFloorSprites } from '../office/floorTiles.js'
 import { setWallSprites } from '../office/wallTiles.js'
 import { setCharacterTemplates } from '../office/sprites/spriteData.js'
-import { vscode } from '../vscodeApi.js'
+import { appBridge } from '../appBridge.js'
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js'
 
 export interface SubagentCharacter {
@@ -54,7 +54,7 @@ export interface ProjectSessions {
   sessions: SessionInfo[]
 }
 
-export interface ExtensionMessageState {
+export interface AppMessageState {
   agents: number[]
   selectedAgent: number | null
   agentTools: Record<number, ToolActivity[]>
@@ -75,14 +75,14 @@ function saveAgentSeats(os: OfficeState): void {
     if (ch.isSubagent) continue
     seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId: ch.seatId }
   }
-  vscode.postMessage({ type: 'saveAgentSeats', seats })
+  appBridge.postMessage({ type: 'saveAgentSeats', seats })
 }
 
-export function useExtensionMessages(
+export function useAppMessages(
   getOfficeState: () => OfficeState,
   onLayoutLoaded?: (layout: OfficeLayout) => void,
   isEditDirty?: () => boolean,
-): ExtensionMessageState {
+): AppMessageState {
   const [agents, setAgents] = useState<number[]>([])
   const [selectedAgent, setSelectedAgent] = useState<number | null>(null)
   const [agentTools, setAgentTools] = useState<Record<number, ToolActivity[]>>({})
@@ -391,7 +391,7 @@ export function useExtensionMessages(
       }
     }
     window.addEventListener('message', handler)
-    vscode.postMessage({ type: 'webviewReady' })
+    appBridge.postMessage({ type: 'webviewReady' })
     return () => window.removeEventListener('message', handler)
   }, [getOfficeState])
 
