@@ -80,6 +80,77 @@ function renderTileGridCached(
   ctx.drawImage(tileGridCache, offsetX, offsetY)
 }
 
+// ── Title ───────────────────────────────────────────────────────
+
+function renderTitle(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  _mapW: number,
+  mapH: number,
+  zoom: number,
+  tileMap: TileTypeVal[][],
+  cols: number,
+): void {
+  // Find the largest VOID rectangle to place the title
+  const rows = tileMap.length
+  if (rows === 0) return
+
+  // Scan for VOID region center of mass
+  let voidSumCol = 0, voidSumRow = 0, voidCount = 0
+  for (let r = 0; r < rows; r++) {
+    const row = tileMap[r]
+    if (!row) continue
+    for (let c = 0; c < cols; c++) {
+      if (row[c] === TileType.VOID) {
+        voidSumCol += c
+        voidSumRow += r
+        voidCount++
+      }
+    }
+  }
+  if (voidCount < 4) return // Not enough void space
+
+  const centerCol = voidSumCol / voidCount
+  const centerRow = voidSumRow / voidCount
+  const s = TILE_SIZE * zoom
+
+  const titleSize = Math.round(zoom * 20)
+  const subSize = Math.round(zoom * 10)
+  const tx = offsetX + (centerCol + 3) * s
+  const ty = offsetY + (centerRow + 0.5) * s
+
+  // Measure main title for box size
+  ctx.font = `bold ${titleSize}px "FS Pixel Sans", sans-serif`
+  const titleMetrics = ctx.measureText('Clodo Hôtel')
+  const padX = titleSize * 0.5
+  const padY = titleSize * 0.4
+  const boxW = titleMetrics.width + padX * 2
+  const boxH = titleSize + subSize + padY * 2.5
+
+  // Background box
+  ctx.fillStyle = '#7c5cbf'
+  ctx.fillRect(Math.round(tx - boxW / 2), Math.round(ty - boxH / 2), Math.round(boxW), Math.round(boxH))
+
+  // Border (pixel style, white outline)
+  const borderW = Math.max(2, Math.round(zoom * 0.5))
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = borderW
+  ctx.strokeRect(Math.round(tx - boxW / 2), Math.round(ty - boxH / 2), Math.round(boxW), Math.round(boxH))
+
+  // "Welcome to" subtitle
+  ctx.font = `${subSize}px "FS Pixel Sans", sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
+  ctx.fillText('Welcome to', Math.round(tx), Math.round(ty - titleSize * 0.35))
+
+  // Main title
+  ctx.font = `bold ${titleSize}px "FS Pixel Sans", sans-serif`
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText('Clodo Hôtel', Math.round(tx), Math.round(ty + subSize * 0.4))
+}
+
 // ── Render functions ────────────────────────────────────────────
 
 export function renderTileGrid(
@@ -594,6 +665,9 @@ export function renderFrame(
   const mapH = rows * TILE_SIZE * zoom
   const offsetX = Math.floor((canvasWidth - mapW) / 2) + Math.round(panX)
   const offsetY = Math.floor((canvasHeight - mapH) / 2) + Math.round(panY)
+
+  // Title rendered behind tiles — visible only through VOID areas
+  renderTitle(ctx, offsetX, offsetY, mapW, mapH, zoom, tileMap, cols)
 
   // Draw tiles (floor + wall base color) — cached offscreen
   renderTileGridCached(ctx, tileMap, offsetX, offsetY, zoom, tileColors, layoutCols)
