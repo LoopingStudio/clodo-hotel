@@ -18,6 +18,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Sync version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Syncing version to $VERSION"
+          sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" tauri-app/src-tauri/tauri.conf.json
+          sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" tauri-app/src-tauri/Cargo.toml
+
       - name: Install webview-ui dependencies
         run: npm install
         working-directory: webview-ui
