@@ -8,11 +8,11 @@ import { EditTool } from './office/types.js'
 import { isRotatable } from './office/layout/furnitureCatalog.js'
 import { appBridge } from './appBridge.js'
 import { useAppMessages } from './hooks/useAppMessages.js'
-import { PULSE_ANIMATION_DURATION_SEC } from './constants.js'
+import { PULSE_ANIMATION_DURATION_SEC, TYPE_FRAME_DURATION_SEC } from './constants.js'
 import { useEditorActions } from './hooks/useEditorActions.js'
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js'
 import { ZoomControls } from './components/ZoomControls.js'
-import { generateDockIconRgba, type DockIconState } from './dockIcon.js'
+import { generateDockIconPng, type DockIconState } from './dockIcon.js'
 import { BottomToolbar } from './components/BottomToolbar.js'
 import { DebugView } from './components/DebugView.js'
 import { SessionPickerModal } from './components/SessionPickerModal.js'
@@ -127,19 +127,34 @@ function App() {
 
 
   // Dock icon — only in Tauri mode
-  const dockIconState = useMemo<DockIconState>(() => {
-    if (agents.some(id => agentStatuses[id] === 'waiting')) return 'waiting'
-    if (agents.some(id => (agentTools[id] || []).some(t => !t.done))) return 'active'
-    return 'idle'
-  }, [agents, agentStatuses, agentTools])
+  const dockIconInfo = useMemo(() => {
+    const office = getOfficeState()
+    // Find first active agent (has running tools)
+    const activeId = agents.find(id => (agentTools[id] || []).some(t => !t.done))
+    // Or first waiting agent
+    const waitingId = agents.find(id => agentStatuses[id] === 'waiting')
+    const relevantId = waitingId ?? activeId ?? agents[0]
+    const ch = relevantId != null ? office?.characters.get(relevantId) : undefined
+    const state: DockIconState = waitingId != null ? 'waiting' : activeId != null ? 'active' : 'idle'
+    const waitingCount = agents.filter(id => (agentTools[id] || []).some(t => t.permissionWait)).length
+    return { state, palette: ch?.palette ?? 0, hueShift: ch?.hueShift ?? 0, waitingCount }
+  }, [agents, agentStatuses, agentTools, getOfficeState])
 
   useEffect(() => {
     if (!layoutReady || !('__TAURI__' in window)) return
-    const icon = generateDockIconRgba(dockIconState)
-    if (icon) {
-      appBridge.postMessage({ type: 'setDockIcon', rgba: icon.data, width: icon.width, height: icon.height })
+    const { state, palette, hueShift, waitingCount } = dockIconInfo
+    const sendIcon = (frame: number) => {
+      const png = generateDockIconPng(state, frame, palette, hueShift)
+      if (png) appBridge.postMessage({ type: 'setDockIcon', png })
     }
-  }, [dockIconState, layoutReady])
+    appBridge.postMessage({ type: 'setDockBadge', label: waitingCount > 0 ? String(waitingCount) : '' })
+    sendIcon(0)
+    if (state === 'active') {
+      let frame = 0
+      const id = setInterval(() => { frame = 1 - frame; sendIcon(frame) }, TYPE_FRAME_DURATION_SEC * 1000)
+      return () => clearInterval(id)
+    }
+  }, [dockIconInfo, layoutReady])
 
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false)
   const [isDebugMode, setIsDebugMode] = useState(false)

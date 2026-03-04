@@ -40,6 +40,46 @@ import {
   ROTATE_BUTTON_BG,
 } from '../../constants.js'
 
+// ── Tile grid cache ─────────────────────────────────────────────
+// Caches the floor + wall base color layer on an offscreen canvas.
+// Invalidated when layout or zoom changes.
+let tileGridCache: OffscreenCanvas | null = null
+let tileGridCacheKey = ''
+
+export function invalidateTileGridCache(): void {
+  tileGridCache = null
+  tileGridCacheKey = ''
+}
+
+function renderTileGridCached(
+  ctx: CanvasRenderingContext2D,
+  tileMap: TileTypeVal[][],
+  offsetX: number,
+  offsetY: number,
+  zoom: number,
+  tileColors?: Array<FloorColor | null>,
+  cols?: number,
+): void {
+  const tmRows = tileMap.length
+  const tmCols = tmRows > 0 ? tileMap[0].length : 0
+  const layoutCols = cols ?? tmCols
+  // Simple cache key: dimensions + zoom + tileColors hash (length + first/last color)
+  const colorSample = tileColors ? `${tileColors.length}:${JSON.stringify(tileColors[0])}:${JSON.stringify(tileColors[tileColors.length - 1])}` : ''
+  const key = `${tmRows}:${tmCols}:${zoom}:${colorSample}`
+
+  if (tileGridCacheKey !== key || !tileGridCache) {
+    const w = layoutCols * TILE_SIZE * zoom
+    const h = tmRows * TILE_SIZE * zoom
+    tileGridCache = new OffscreenCanvas(w, h)
+    const offCtx = tileGridCache.getContext('2d')!
+    offCtx.imageSmoothingEnabled = false
+    renderTileGrid(offCtx as unknown as CanvasRenderingContext2D, tileMap, 0, 0, zoom, tileColors, cols)
+    tileGridCacheKey = key
+  }
+
+  ctx.drawImage(tileGridCache, offsetX, offsetY)
+}
+
 // ── Render functions ────────────────────────────────────────────
 
 export function renderTileGrid(
@@ -555,8 +595,8 @@ export function renderFrame(
   const offsetX = Math.floor((canvasWidth - mapW) / 2) + Math.round(panX)
   const offsetY = Math.floor((canvasHeight - mapH) / 2) + Math.round(panY)
 
-  // Draw tiles (floor + wall base color)
-  renderTileGrid(ctx, tileMap, offsetX, offsetY, zoom, tileColors, layoutCols)
+  // Draw tiles (floor + wall base color) — cached offscreen
+  renderTileGridCached(ctx, tileMap, offsetX, offsetY, zoom, tileColors, layoutCols)
 
   // Seat indicators (below furniture/characters, on top of floor)
   if (selection) {

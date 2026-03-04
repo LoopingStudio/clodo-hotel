@@ -18,6 +18,7 @@ export const WANDER_MOVES_BEFORE_REST_MIN = 3
 export const WANDER_MOVES_BEFORE_REST_MAX = 6
 export const SEAT_REST_MIN_SEC = 5.0
 export const SEAT_REST_MAX_SEC = 10.0
+export const SLEEP_MODE_DELAY_SEC = 5 * 60
 
 // ── Matrix Effect ────────────────────────────────────────────
 export const MATRIX_EFFECT_DURATION_SEC = 0.3
@@ -99,6 +100,8 @@ export const NOTIFICATION_VOLUME = 0.14
 
 // ── Game Logic ───────────────────────────────────────────────
 export const MAX_DELTA_TIME_SEC = 0.1
+export const TARGET_FPS = 24
+export const FRAME_MIN_INTERVAL_MS = 1000 / TARGET_FPS
 export const WAITING_BUBBLE_DURATION_SEC = 2.0
 export const DISMISS_BUBBLE_FAST_FADE_SEC = 0.3
 export const INACTIVE_SEAT_TIMER_MIN_SEC = 3.0

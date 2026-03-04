@@ -13,10 +13,12 @@ import {
   CHARACTER_SITTING_OFFSET_PX,
   CHARACTER_HIT_HALF_WIDTH,
   CHARACTER_HIT_HEIGHT,
+  SLEEP_MODE_DELAY_SEC,
 } from '../../constants.js'
 import type { Character, Seat, FurnitureInstance, TileType as TileTypeVal, OfficeLayout, PlacedFurniture } from '../types.js'
 import { createCharacter, updateCharacter } from './characters.js'
 import { matrixEffectSeeds } from './matrixEffect.js'
+import { invalidateTileGridCache } from './renderer.js'
 import { isWalkable, getWalkableTiles, findPath } from '../layout/tileMap.js'
 import {
   createDefaultLayout,
@@ -41,6 +43,10 @@ export class OfficeState {
   hoveredTile: { col: number; row: number } | null = null
   /** Maps "parentId:toolId" → sub-agent character ID (negative) */
   subagentIdMap: Map<string, number> = new Map()
+  /** Time in seconds since all agents became inactive */
+  allIdleTimer = 0
+  /** Whether sleep mode is active (all agents idle for SLEEP_MODE_DELAY_SEC) */
+  isSleeping = false
   /** Reverse lookup: sub-agent character ID → parent info */
   subagentMeta: Map<number, { parentAgentId: number; parentToolId: string }> = new Map()
   private nextSubagentId = -1
@@ -59,6 +65,8 @@ export class OfficeState {
   rebuildFromLayout(layout: OfficeLayout, shift?: { col: number; row: number }): void {
     this.layout = layout
     this.tileMap = layoutToTileMap(layout)
+    // Invalidate tile render cache when layout changes
+    invalidateTileGridCache()
     this.seats = layoutToSeats(layout.furniture)
     this.blockedTiles = getBlockedTiles(layout.furniture)
     this.rebuildFurnitureInstances()
@@ -617,6 +625,18 @@ export class OfficeState {
   }
 
   update(dt: number): void {
+    // Track all-idle timer for sleep mode
+    const anyActive = Array.from(this.characters.values()).some(ch => ch.id >= 0 && ch.isActive)
+    if (anyActive) {
+      this.allIdleTimer = 0
+      this.isSleeping = false
+    } else {
+      this.allIdleTimer += dt
+      if (this.allIdleTimer >= SLEEP_MODE_DELAY_SEC) {
+        this.isSleeping = true
+      }
+    }
+
     const toDelete: number[] = []
     for (const ch of this.characters.values()) {
       // Handle matrix effect animation
@@ -634,6 +654,11 @@ export class OfficeState {
           }
         }
         continue // skip normal FSM while effect is active
+      }
+
+      // Sleep mode: let walking characters finish their path, then freeze
+      if (this.isSleeping && !ch.isActive && ch.state !== CharacterState.WALK) {
+        continue
       }
 
       // Temporarily unblock own seat so character can pathfind to it

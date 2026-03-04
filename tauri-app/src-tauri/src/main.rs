@@ -45,6 +45,39 @@ async fn emit_available_sessions(state: &SharedState, app_handle: &tauri::AppHan
     );
 }
 
+fn set_dock_badge(label: &str) {
+    use cocoa::appkit::NSApp;
+    use cocoa::base::id;
+    use cocoa::foundation::NSString;
+    use objc::{msg_send, sel, sel_impl};
+    unsafe {
+        let app: id = NSApp();
+        let dock_tile: id = msg_send![app, dockTile];
+        let ns_label: id = NSString::alloc(cocoa::base::nil).init_str(label);
+        let _: () = msg_send![dock_tile, setBadgeLabel: ns_label];
+    }
+}
+
+fn set_dock_icon(png_bytes: &[u8]) {
+    use cocoa::appkit::NSApp;
+    use cocoa::base::{id, nil};
+    use cocoa::foundation::NSData as CocoaNSData;
+    use objc::{msg_send, sel, sel_impl, class};
+    unsafe {
+        let data: id = CocoaNSData::dataWithBytes_length_(
+            nil,
+            png_bytes.as_ptr() as *const std::ffi::c_void,
+            png_bytes.len() as u64,
+        );
+        let image: id = msg_send![class!(NSImage), alloc];
+        let image: id = msg_send![image, initWithData: data];
+        if image != nil {
+            let app: id = NSApp();
+            let _: () = msg_send![app, setApplicationIconImage: image];
+        }
+    }
+}
+
 /// Single entry point from the webview for all messages.
 /// Re-dispatches based on `message.type`.
 #[tauri::command]
@@ -237,19 +270,17 @@ async fn handle_message(
         }
 
         "setDockIcon" => {
-            if let (Some(b64), Some(w), Some(h)) = (
-                message.get("rgba").and_then(|v| v.as_str()),
-                message.get("width").and_then(|v| v.as_u64()),
-                message.get("height").and_then(|v| v.as_u64()),
-            ) {
+            if let Some(b64) = message.get("png").and_then(|v| v.as_str()) {
                 use base64::Engine;
-                if let Ok(rgba) = base64::engine::general_purpose::STANDARD.decode(b64) {
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        let icon = tauri::image::Image::new_owned(rgba, w as u32, h as u32);
-                        let _: Result<(), _> = window.set_icon(icon);
-                    }
+                if let Ok(png_bytes) = base64::engine::general_purpose::STANDARD.decode(b64) {
+                    set_dock_icon(&png_bytes);
                 }
             }
+        }
+
+        "setDockBadge" => {
+            let label = message.get("label").and_then(|v| v.as_str()).unwrap_or("");
+            set_dock_badge(label);
         }
 
         "relaunchApp" => {
@@ -410,19 +441,26 @@ async fn check_for_updates(app: tauri::AppHandle) {
     let update = match app.updater() {
         Ok(u) => match u.check().await {
             Ok(Some(u)) => u,
-            _ => return,
+            Ok(None) => return,
+            Err(e) => { eprintln!("[updater] check failed: {e}"); return; }
         },
-        Err(_) => return,
+        Err(e) => { eprintln!("[updater] init failed: {e}"); return; }
     };
     let version = update.version.clone();
+    println!("[updater] update available: v{version}");
     let _ = app.emit(
         "pa-message",
         serde_json::json!({ "type": "updateAvailable", "version": version }),
     );
-    if update.download_and_install(|_, _| {}, || {}).await.is_ok() {
-        let _ = app.emit("pa-message", serde_json::json!({ "type": "updateReady" }));
+    match update.download_and_install(|_, _| {}, || {}).await {
+        Ok(_) => {
+            println!("[updater] update ready, waiting for relaunch");
+            let _ = app.emit("pa-message", serde_json::json!({ "type": "updateReady" }));
+        }
+        Err(e) => eprintln!("[updater] download/install failed: {e}"),
     }
 }
+
 
 fn main() {
     let shared_state: SharedState = Arc::new(Mutex::new(AppState::new()));

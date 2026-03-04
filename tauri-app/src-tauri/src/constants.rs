@@ -1,8 +1,8 @@
 // ── Timing (ms) ──────────────────────────────────────────────
-pub const JSONL_POLL_INTERVAL_MS: u64 = 1000;
-pub const FILE_WATCHER_POLL_INTERVAL_MS: u64 = 1000;
+pub const JSONL_POLL_INTERVAL_MS: u64 = 500;
+pub const FILE_WATCHER_POLL_INTERVAL_MS: u64 = 500;
 pub const TOOL_DONE_DELAY_MS: u64 = 300;
-pub const PERMISSION_TIMER_DELAY_MS: u64 = 7000;
+pub const PERMISSION_TIMER_DELAY_MS: u64 = 4000;
 pub const TEXT_IDLE_DELAY_MS: u64 = 5000;
 
 // ── Session Scanner ───────────────────────────────────────────

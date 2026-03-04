@@ -3,14 +3,14 @@ import { Direction } from './office/types.js'
 
 export type DockIconState = 'idle' | 'active' | 'waiting'
 
-const SIZE = 64
-const SCALE = 2
+const SIZE = 128
+const SCALE = 4
 
-/** Render a 64×64 dock icon based on agent state. Returns raw RGBA as base64. */
-export function generateDockIconRgba(state: DockIconState): { data: string; width: number; height: number } | null {
-  const sprites = getCharacterSprites(0)
+/** Render a dock icon as PNG base64. Transparent background, just the avatar. */
+export function generateDockIconPng(state: DockIconState, frameIndex = 0, palette = 0, hueShift = 0): string | null {
+  const sprites = getCharacterSprites(palette, hueShift)
   const sprite = state === 'active'
-    ? sprites.typing[Direction.DOWN][0]
+    ? sprites.typing[Direction.DOWN][frameIndex % 2]
     : sprites.walk[Direction.DOWN][1]
 
   const canvas = document.createElement('canvas')
@@ -19,11 +19,7 @@ export function generateDockIconRgba(state: DockIconState): { data: string; widt
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
 
-  // Background
-  ctx.fillStyle = '#1e1e2e'
-  ctx.fillRect(0, 0, SIZE, SIZE)
-
-  // Character sprite centered
+  // Character sprite centered — transparent background
   const spriteH = sprite.length
   const spriteW = sprite[0]?.length ?? 0
   const offsetX = Math.floor((SIZE - spriteW * SCALE) / 2)
@@ -39,23 +35,7 @@ export function generateDockIconRgba(state: DockIconState): { data: string; widt
     }
   }
 
-  // State indicator dot — bottom-right, pixel art style
-  if (state !== 'idle') {
-    const dotColor = state === 'active' ? '#4cff6e' : '#ffd93d'
-    const dotBright = state === 'active' ? '#afffbf' : '#fff7b0'
-    ctx.fillStyle = dotColor
-    ctx.fillRect(SIZE - 14, SIZE - 14, 10, 10)
-    ctx.fillStyle = dotBright
-    ctx.fillRect(SIZE - 12, SIZE - 12, 4, 4)
-  }
-
-  // Raw RGBA → base64 (avoid spread operator for large arrays)
-  const imageData = ctx.getImageData(0, 0, SIZE, SIZE)
-  const bytes = new Uint8Array(imageData.data.buffer)
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-
-  return { data: btoa(binary), width: SIZE, height: SIZE }
+  // Export as PNG data URL, strip prefix, return raw base64
+  const dataUrl = canvas.toDataURL('image/png')
+  return dataUrl.replace('data:image/png;base64,', '')
 }
