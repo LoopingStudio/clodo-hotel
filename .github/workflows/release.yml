@@ -17,8 +17,6 @@ jobs:
           node-version: 20
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin
 
       - name: Install webview-ui dependencies
         run: npm install
@@ -46,4 +44,3 @@ jobs:
           releaseBody: ''
           tauriScript: npm run tauri
           projectPath: tauri-app
-          args: --target aarch64-apple-darwin
