@@ -127,15 +127,17 @@ function App() {
 
 
   // Dock icon — only in Tauri mode
+  const lastActiveIdRef = useRef<number | null>(null)
   const dockIconInfo = useMemo(() => {
-    const office = getOfficeState()
-    // Find first active agent (has running tools)
+    // Find first agent with permission wait, then first active
+    const permissionId = agents.find(id => (agentTools[id] || []).some(t => t.permissionWait))
     const activeId = agents.find(id => (agentTools[id] || []).some(t => !t.done))
-    // Or first waiting agent
-    const waitingId = agents.find(id => agentStatuses[id] === 'waiting')
-    const relevantId = waitingId ?? activeId ?? agents[0]
-    const ch = relevantId != null ? office?.characters.get(relevantId) : undefined
-    const state: DockIconState = waitingId != null ? 'waiting' : activeId != null ? 'active' : 'idle'
+    // Remember the last active/permission agent — only switch when someone else becomes active
+    if (permissionId != null) lastActiveIdRef.current = permissionId
+    else if (activeId != null) lastActiveIdRef.current = activeId
+    const relevantId = permissionId ?? activeId ?? lastActiveIdRef.current ?? agents[0]
+    const ch = relevantId != null ? getOfficeState()?.characters.get(relevantId) : undefined
+    const state: DockIconState = permissionId != null ? 'waiting' : activeId != null ? 'active' : 'idle'
     const waitingCount = agents.filter(id => (agentTools[id] || []).some(t => t.permissionWait)).length
     return { state, palette: ch?.palette ?? 0, hueShift: ch?.hueShift ?? 0, waitingCount }
   }, [agents, agentStatuses, agentTools, getOfficeState])

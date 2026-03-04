@@ -314,7 +314,7 @@ dependencies = [
 
 [[package]]
 name = "clodo-hotel"
-version = "1.0.4"
+version = "1.0.8"
 dependencies = [
  "base64 0.22.1",
  "cocoa",
