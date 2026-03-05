@@ -6,6 +6,7 @@ import { appBridge } from '../appBridge.js'
 interface BottomToolbarProps {
   isEditMode: boolean
   onOpenClaude: () => void
+  onSpawnAgent: () => void
   onToggleEditMode: () => void
   isDebugMode: boolean
   onToggleDebugMode: () => void
@@ -47,6 +48,7 @@ const btnActive: React.CSSProperties = {
 export function BottomToolbar({
   isEditMode,
   onOpenClaude,
+  onSpawnAgent,
   onToggleEditMode,
   isDebugMode,
   onToggleDebugMode,
@@ -146,6 +148,24 @@ export function BottomToolbar({
           </div>
         )}
       </div>
+      <button
+        onClick={onSpawnAgent}
+        onMouseEnter={() => setHovered('spawn')}
+        onMouseLeave={() => setHovered(null)}
+        style={{
+          ...btnBase,
+          padding: '5px 12px',
+          background:
+            hovered === 'spawn'
+              ? 'var(--pixel-agent-hover-bg)'
+              : 'var(--pixel-agent-bg)',
+          border: '2px solid var(--pixel-agent-border)',
+          color: 'var(--pixel-agent-text)',
+        }}
+        title="Launch new Claude session with embedded terminal"
+      >
+        + Terminal
+      </button>
       <button
         onClick={onToggleEditMode}
         onMouseEnter={() => setHovered('edit')}

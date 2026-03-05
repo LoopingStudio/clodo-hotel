@@ -10,6 +10,7 @@ tauri-app/src-tauri/src/       — Rust backend (Tauri 2 + Tokio)
   constants.rs                 — All backend magic numbers (timing, truncation, asset parsing)
   types.rs                     — AgentState, AppState, PersistedState, SeatMeta
   agent_server.rs              — Agent lifecycle: add, remove, restore, persist
+  pty_manager.rs               — PTY lifecycle: spawn portable-pty, read/write/resize, stream output
   session_scanner.rs           — Scan ~/.claude/projects/ for JSONL sessions
   file_watcher.rs              — 500ms polling, readNewLines, partial line buffering
   transcript_parser.rs         — JSONL parsing: tool_use/tool_result → frontend events
@@ -31,8 +32,10 @@ webview-ui/src/                — React 19 + TypeScript (Vite)
     useEditorActions.ts        — Editor state + callbacks
     useEditorKeyboard.ts       — Keyboard shortcut effect
   components/
-    BottomToolbar.tsx           — + Agent, Layout toggle, Settings button
+    BottomToolbar.tsx           — + Agent, + Terminal, Layout toggle, Settings button
     SessionPicker.tsx           — Modal to select Claude Code sessions
+    TerminalPanel.tsx           — Side panel: xterm.js for PTY agents, transcript for observed
+    TranscriptView.tsx          — Read-only JSONL conversation view for observed agents
     ZoomControls.tsx            — +/- zoom (top-right)
     SettingsModal.tsx           — Settings, export/import layout, sound toggle, debug toggle
     DebugView.tsx               — Debug overlay
@@ -115,6 +118,16 @@ JSONL transcripts at `~/.claude/projects/<project-hash>/<session-id>.jsonl`. Pro
 **Speech bubbles**: Permission ("..." amber) stays until cleared. Waiting (green checkmark) auto-fades 2s.
 
 **Sound notifications**: Two-note chime (E5 → E6) via Web Audio API on `agentStatus: 'waiting'`. Toggled in Settings.
+
+## Embedded Terminal
+
+**Two agent types**: (1) **Observed agents** — picked from SessionPicker, JSONL-only, transcript view. (2) **Spawned agents** — created via "+ Terminal" button, run `claude --session-id <uuid>` in a `portable-pty`, full interactive xterm.js terminal.
+
+**PTY architecture**: `pty_manager.rs` manages `PtyState` (separate `Arc<Mutex<>>` from `AppState` to avoid contention). `spawn_pty()` creates a `portable-pty` instance, spawns `claude` with session ID, starts a background `spawn_blocking` reader task that emits `ptyOutput` events. `write_pty()` forwards keystrokes. `resize_pty()` resizes the PTY. PTY is auto-closed when agent is removed.
+
+**Frontend**: `TerminalPanel.tsx` renders in a right-side slide-out panel (flex layout). For PTY agents: `@xterm/xterm` + `@xterm/addon-fit` + `@xterm/addon-canvas`. For observed agents: `TranscriptView.tsx` with 2s polling of JSONL data. Panel is resizable via drag handle. Toggle by clicking a character.
+
+**IPC messages**: `spawnAgent` (creates agent + PTY), `spawnPty` / `writePty` / `resizePty` / `closePty` (direct PTY control), `requestTranscript` → `transcriptData` (JSONL read), `ptyOutput` / `ptyExit` / `ptySpawned` / `ptyError` (PTY events).
 
 **Seats**: Derived from chair furniture. Multi-tile chairs produce multiple seats. Facing direction: chair orientation → adjacent desk → forward. Click character → select → click seat → reassign.
 

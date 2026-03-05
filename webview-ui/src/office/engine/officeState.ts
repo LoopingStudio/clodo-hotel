@@ -656,6 +656,9 @@ export class OfficeState {
         continue // skip normal FSM while effect is active
       }
 
+      // Frozen: transcript panel open — character stays put
+      if (ch.frozen) continue
+
       // Sleep mode: let walking characters finish their path, then freeze
       if (this.isSleeping && !ch.isActive && ch.state !== CharacterState.WALK) {
         continue

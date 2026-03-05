@@ -16,6 +16,7 @@ import { generateDockIconPng, type DockIconState } from './dockIcon.js'
 import { BottomToolbar } from './components/BottomToolbar.js'
 import { DebugView } from './components/DebugView.js'
 import { SessionPickerModal } from './components/SessionPickerModal.js'
+import { TerminalPanel } from './components/TerminalPanel.js'
 
 // Game state lives outside React — updated imperatively by message handlers
 const officeStateRef = { current: null as OfficeState | null }
@@ -160,12 +161,54 @@ function App() {
 
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false)
   const [isDebugMode, setIsDebugMode] = useState(false)
+  const [terminalAgentId, setTerminalAgentId] = useState<number | null>(null)
+  // Track which agents have PTYs (spawned by us)
+  const [ptyAgents, setPtyAgents] = useState<Set<number>>(() => new Set())
+  // Buffer PTY output so it survives panel close/reopen
+  const ptyBuffersRef = useRef<Map<number, string[]>>(new Map())
+
+  // Listen for PTY-related messages
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      const msg = e.data
+      if (!msg || typeof msg !== 'object') return
+      if (msg.type === 'ptySpawned' && typeof msg.agentId === 'number') {
+        setPtyAgents(prev => new Set(prev).add(msg.agentId))
+        ptyBuffersRef.current.set(msg.agentId, [])
+        setTerminalAgentId(msg.agentId)
+      }
+      if (msg.type === 'ptyOutput' && typeof msg.agentId === 'number') {
+        const buf = ptyBuffersRef.current.get(msg.agentId)
+        if (buf) buf.push(msg.data)
+      }
+      if (msg.type === 'ptyExit' && typeof msg.agentId === 'number') {
+        const buf = ptyBuffersRef.current.get(msg.agentId)
+        if (buf) buf.push('\r\n\x1b[90m[Process exited]\x1b[0m\r\n')
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
 
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), [])
 
   const handleSelectAgent = useCallback((id: number) => {
     appBridge.postMessage({ type: 'focusAgent', id })
   }, [])
+
+  // Freeze/unfreeze character when terminal panel opens/closes
+  useEffect(() => {
+    const os = getOfficeState()
+    // Unfreeze all first
+    for (const ch of os.characters.values()) {
+      ch.frozen = false
+    }
+    // Freeze the targeted agent
+    if (terminalAgentId !== null) {
+      const ch = os.characters.get(terminalAgentId)
+      if (ch) ch.frozen = true
+    }
+  }, [terminalAgentId])
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -184,6 +227,7 @@ function App() {
 
   const handleCloseAgent = useCallback((id: number) => {
     appBridge.postMessage({ type: 'closeAgent', id })
+    setTerminalAgentId(prev => prev === id ? null : prev)
   }, [])
 
   const handleClick = useCallback((agentId: number) => {
@@ -192,6 +236,8 @@ function App() {
     const meta = os.subagentMeta.get(agentId)
     const focusId = meta ? meta.parentAgentId : agentId
     appBridge.postMessage({ type: 'focusAgent', id: focusId })
+    // Toggle terminal panel for this agent
+    setTerminalAgentId(prev => prev === focusId ? null : focusId)
   }, [])
 
   const officeState = getOfficeState()
@@ -265,6 +311,13 @@ function App() {
       <BottomToolbar
         isEditMode={editor.isEditMode}
         onOpenClaude={() => { editor.handleOpenClaude(); setIsSessionPickerOpen(true) }}
+        onSpawnAgent={() => {
+          appBridge.postMessage({
+            type: 'spawnAgent',
+            cols: 80,
+            rows: 24,
+          })
+        }}
         onToggleEditMode={editor.handleToggleEditMode}
         isDebugMode={isDebugMode}
         onToggleDebugMode={handleToggleDebugMode}
@@ -386,6 +439,16 @@ function App() {
         <SessionPickerModal
           projects={availableSessions}
           onClose={() => setIsSessionPickerOpen(false)}
+        />
+      )}
+
+      {terminalAgentId !== null && (
+        <TerminalPanel
+          agentId={terminalAgentId}
+          agentName={getOfficeState().characters.get(terminalAgentId)?.folderName ?? `Agent ${terminalAgentId}`}
+          hasPty={ptyAgents.has(terminalAgentId)}
+          initialData={ptyBuffersRef.current.get(terminalAgentId)}
+          onClose={() => setTerminalAgentId(null)}
         />
       )}
     </div>

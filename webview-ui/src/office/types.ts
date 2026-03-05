@@ -195,4 +195,6 @@ export interface Character {
   matrixEffectSeeds: number[]
   /** Workspace folder name (only set for multi-root workspaces) */
   folderName?: string
+  /** When true, character stops moving (transcript panel open) */
+  frozen?: boolean
 }

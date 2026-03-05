@@ -10,6 +10,7 @@ mod asset_loader;
 mod transcript_parser;
 mod file_watcher;
 mod agent_server;
+mod pty_manager;
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -27,6 +28,7 @@ use layout_persistence::{
 };
 use session_scanner::{scan_sessions, find_recent_sessions, claude_projects_dir};
 use types::{AppState, SharedState};
+use pty_manager::{PtyState, SharedPtyState};
 
 fn is_valid_layout(layout: &serde_json::Value) -> bool {
     layout.get("version").and_then(|v| v.as_i64()).map(|v| v == 1).unwrap_or(false)
@@ -84,9 +86,11 @@ fn set_dock_icon(png_bytes: &[u8]) {
 async fn handle_message(
     message: serde_json::Value,
     state: tauri::State<'_, SharedState>,
+    pty_state: tauri::State<'_, SharedPtyState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let state_arc = state.inner().clone();
+    let pty_arc = pty_state.inner().clone();
     let msg_type = message.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
     match msg_type {
@@ -144,6 +148,7 @@ async fn handle_message(
         "closeAgent" | "removeSession" => {
             if let Some(id) = message.get("id").and_then(|v| v.as_u64()) {
                 remove_agent(id as u32, &state_arc, &app_handle).await;
+                pty_manager::close_pty(id as u32, &pty_arc).await;
 
                 emit_available_sessions(&state_arc, &app_handle).await;
             }
@@ -285,6 +290,156 @@ async fn handle_message(
 
         "relaunchApp" => {
             app_handle.restart();
+        }
+
+        // ── Spawn new agent with embedded terminal ────────────
+        "spawnAgent" => {
+            let project_dir;
+            let folder_name;
+
+            let has_dir = message.get("projectDir").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
+            if has_dir {
+                project_dir = message.get("projectDir").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                folder_name = message.get("folderName").and_then(|v| v.as_str()).map(|s| s.to_string());
+            } else {
+                // Open native folder picker
+                let ah = app_handle.clone();
+                let picked = tokio::task::spawn_blocking(move || {
+                    use tauri_plugin_dialog::DialogExt;
+                    ah.dialog()
+                        .file()
+                        .blocking_pick_folder()
+                        .and_then(|fp| fp.into_path().ok())
+                })
+                .await
+                .ok()
+                .flatten();
+
+                match picked {
+                    Some(path) => {
+                        folder_name = path.file_name().and_then(|n| n.to_str()).map(|s| s.to_string());
+                        project_dir = path.to_string_lossy().to_string();
+                    }
+                    None => return Ok(()), // User cancelled
+                }
+            }
+
+            let cols = message.get("cols").and_then(|v| v.as_u64()).unwrap_or(80) as u16;
+            let rows = message.get("rows").and_then(|v| v.as_u64()).unwrap_or(24) as u16;
+
+            // Generate a new session ID
+            let session_id = uuid::Uuid::new_v4().to_string();
+
+            // Determine JSONL file path
+            let project_hash = project_dir.replace([':', '\\', '/'], "-");
+            let jsonl_dir = dirs::home_dir()
+                .unwrap_or_default()
+                .join(".claude")
+                .join("projects")
+                .join(&project_hash);
+            let jsonl_file = jsonl_dir.join(format!("{session_id}.jsonl")).to_string_lossy().to_string();
+
+            // Create the agent (will start watching JSONL when it appears)
+            let agent_id = add_session_as_agent(
+                session_id.clone(),
+                project_dir.clone(),
+                jsonl_file,
+                folder_name,
+                &state_arc,
+                &app_handle,
+            ).await;
+
+            // Spawn PTY with claude
+            if let Err(e) = pty_manager::spawn_pty(
+                agent_id, &session_id, &project_dir, cols, rows, &pty_arc, &app_handle,
+            ).await {
+                eprintln!("[Clodo Hotel] spawnAgent PTY error: {e}");
+                let _ = app_handle.emit(
+                    "pa-message",
+                    serde_json::json!({ "type": "ptyError", "agentId": agent_id, "error": e }),
+                );
+            } else {
+                let _ = app_handle.emit(
+                    "pa-message",
+                    serde_json::json!({ "type": "ptySpawned", "agentId": agent_id }),
+                );
+            }
+
+            emit_available_sessions(&state_arc, &app_handle).await;
+        }
+
+        // ── PTY management ──────────────────────────────────────
+        "spawnPty" => {
+            let agent_id = message.get("agentId").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+            let session_id = message.get("sessionId").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let project_dir = message.get("projectDir").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let cols = message.get("cols").and_then(|v| v.as_u64()).unwrap_or(80) as u16;
+            let rows = message.get("rows").and_then(|v| v.as_u64()).unwrap_or(24) as u16;
+
+            if let Err(e) = pty_manager::spawn_pty(
+                agent_id, &session_id, &project_dir, cols, rows, &pty_arc, &app_handle,
+            ).await {
+                eprintln!("[Clodo Hotel] spawnPty error: {e}");
+                let _ = app_handle.emit(
+                    "pa-message",
+                    serde_json::json!({ "type": "ptyError", "agentId": agent_id, "error": e }),
+                );
+            }
+        }
+
+        "writePty" => {
+            let agent_id = message.get("agentId").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+            let data = message.get("data").and_then(|v| v.as_str()).unwrap_or("");
+            if let Err(e) = pty_manager::write_pty(agent_id, data, &pty_arc).await {
+                eprintln!("[Clodo Hotel] writePty error: {e}");
+            }
+        }
+
+        "resizePty" => {
+            let agent_id = message.get("agentId").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+            let cols = message.get("cols").and_then(|v| v.as_u64()).unwrap_or(80) as u16;
+            let rows = message.get("rows").and_then(|v| v.as_u64()).unwrap_or(24) as u16;
+            if let Err(e) = pty_manager::resize_pty(agent_id, cols, rows, &pty_arc).await {
+                eprintln!("[Clodo Hotel] resizePty error: {e}");
+            }
+        }
+
+        "requestTranscript" => {
+            let agent_id = message.get("agentId").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+            let limit = message.get("limit").and_then(|v| v.as_u64()).unwrap_or(200) as usize;
+
+            let jsonl_file = {
+                let s = state_arc.lock().await;
+                s.agents.get(&agent_id).map(|a| a.jsonl_file.clone())
+            };
+
+            if let Some(file) = jsonl_file {
+                if let Ok(content) = std::fs::read_to_string(&file) {
+                    let lines: Vec<serde_json::Value> = content
+                        .lines()
+                        .rev()
+                        .take(limit)
+                        .filter_map(|l| serde_json::from_str(l).ok())
+                        .collect::<Vec<_>>()
+                        .into_iter()
+                        .rev()
+                        .collect();
+
+                    let _ = app_handle.emit(
+                        "pa-message",
+                        serde_json::json!({
+                            "type": "transcriptData",
+                            "agentId": agent_id,
+                            "lines": lines,
+                        }),
+                    );
+                }
+            }
+        }
+
+        "closePty" => {
+            let agent_id = message.get("agentId").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+            pty_manager::close_pty(agent_id, &pty_arc).await;
         }
 
         _ => {
@@ -464,6 +619,7 @@ async fn check_for_updates(app: tauri::AppHandle) {
 
 fn main() {
     let shared_state: SharedState = Arc::new(Mutex::new(AppState::new()));
+    let shared_pty_state: SharedPtyState = Arc::new(Mutex::new(PtyState::new()));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -477,6 +633,7 @@ fn main() {
             Ok(())
         })
         .manage(shared_state)
+        .manage(shared_pty_state)
         .invoke_handler(tauri::generate_handler![handle_message])
         .run(tauri::generate_context!())
         .expect("error while running Clodo Hotel");
